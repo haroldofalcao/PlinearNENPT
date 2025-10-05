@@ -63,7 +63,7 @@ export class ParenteralNutritionOptimizer {
    * Optimize parenteral nutrition formula combination using linear programming.
    */
   optimize(
-    constraints: OptimizationConstraints & { max_bags?: number },
+    constraints: OptimizationConstraints,
     selectedFormulas?: string[],
     customCosts?: Record<string, number>,
     emulsionFilter: string = "All",
@@ -93,11 +93,10 @@ export class ParenteralNutritionOptimizer {
     if (constraints.volume_max > 0) {
       modelConstraints.volume = { max: constraints.volume_max };
     }
-    // Constraint to ensure at least some amount is used
-    modelConstraints.total_bags = { min: 0.1 };
-    // Maximum number of bags constraint
+
+    // max_bags constraint: limits the TOTAL QUANTITY of bags (sum of all quantities)
     if (constraints.max_bags && constraints.max_bags > 0) {
-      modelConstraints.total_bags.max = constraints.max_bags;
+      modelConstraints.total_bags = { max: constraints.max_bags };
     }
 
     // Build model variables
@@ -113,17 +112,21 @@ export class ParenteralNutritionOptimizer {
         nitrogen: (formula.nitrogen_g_l * formula.volume_ml) / 1000,
         glucose: (formula.glucose_g_l * formula.volume_ml) / 1000,
         fat: (formula.fat_g_l * formula.volume_ml) / 1000,
-        total_bags: 1,
+        total_bags: 1, // Each unit of this formula counts as 1 bag
       };
     }
 
     // Build LP model
-    const model = {
+    const model: any = {
       optimize: "cost",
       opType: "min",
       constraints: modelConstraints,
       variables: this.modelVariables,
     };
+
+    // Force all formula quantities to be integers (whole bags only)
+    // This is important because you can't use fractional bags in practice
+    model.ints = Object.keys(this.modelVariables);
 
     try {
       // Solve the model
@@ -155,33 +158,41 @@ export class ParenteralNutritionOptimizer {
     let totalNitrogen = 0;
     let totalGlucose = 0;
     let totalFat = 0;
+    let totalBagsQuantity = 0;
 
     for (const formula of availableFormulas) {
       const quantity = result[formula.id];
 
       if (quantity && quantity > 0.001) {
         const variables = this.modelVariables[formula.id];
+        
+        // Round to integer since we're using integer programming
+        const intQuantity = Math.round(quantity);
 
-        selectedBags.push({
-          formula_id: formula.id,
-          name: formula.name,
-          quantity: parseFloat(quantity.toFixed(3)),
-          unit_cost: variables.cost,
-          total_cost: parseFloat((quantity * variables.cost).toFixed(2)),
-          kcal_contribution: parseFloat((quantity * variables.kcal).toFixed(1)),
-          protein_contribution: parseFloat((quantity * variables.protein).toFixed(2)),
-          volume_contribution: parseFloat((quantity * variables.volume).toFixed(1)),
-          emulsion_type: formula.emulsion_type,
-          via: formula.via,
-          manufacturer: formula.manufacturer,
-        });
+        // Only include if quantity is at least 1
+        if (intQuantity >= 1) {
+          selectedBags.push({
+            formula_id: formula.id,
+            name: formula.name,
+            quantity: intQuantity,
+            unit_cost: variables.cost,
+            total_cost: parseFloat((intQuantity * variables.cost).toFixed(2)),
+            kcal_contribution: parseFloat((intQuantity * variables.kcal).toFixed(1)),
+            protein_contribution: parseFloat((intQuantity * variables.protein).toFixed(2)),
+            volume_contribution: parseFloat((intQuantity * variables.volume).toFixed(1)),
+            emulsion_type: formula.emulsion_type,
+            via: formula.via,
+            manufacturer: formula.manufacturer,
+          });
 
-        totalKcal += quantity * variables.kcal;
-        totalProtein += quantity * variables.protein;
-        totalVolume += quantity * variables.volume;
-        totalNitrogen += quantity * variables.nitrogen;
-        totalGlucose += quantity * variables.glucose;
-        totalFat += quantity * variables.fat;
+          totalKcal += intQuantity * variables.kcal;
+          totalProtein += intQuantity * variables.protein;
+          totalVolume += intQuantity * variables.volume;
+          totalNitrogen += intQuantity * variables.nitrogen;
+          totalGlucose += intQuantity * variables.glucose;
+          totalFat += intQuantity * variables.fat;
+          totalBagsQuantity += intQuantity;
+        }
       }
     }
 
@@ -192,8 +203,13 @@ export class ParenteralNutritionOptimizer {
       constraints
     );
 
+    // Validate max_bags constraint (total quantity of bags)
+    const tolerance = 0.01;
+    const maxBagsMet = !constraints.max_bags || totalBagsQuantity <= constraints.max_bags + tolerance;
+
     return {
-      status: "Optimal",
+      status: maxBagsMet ? "Optimal" : "Infeasible",
+      message: maxBagsMet ? undefined : `Quantidade total de bolsas (${totalBagsQuantity.toFixed(2)}) excede o máximo permitido (${constraints.max_bags})`,
       total_cost: parseFloat(result.result.toFixed(2)),
       total_kcal: parseFloat(totalKcal.toFixed(1)),
       total_protein: parseFloat(totalProtein.toFixed(2)),

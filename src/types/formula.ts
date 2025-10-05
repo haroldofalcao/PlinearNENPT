@@ -21,6 +21,7 @@ export interface OptimizationConstraints {
   protein_min: number;
   protein_max: number;
   volume_max: number;
+  max_bags?: number;
   num_days?: number;
 }
 

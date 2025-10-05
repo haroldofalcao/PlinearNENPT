@@ -247,8 +247,8 @@ describe('ParenteralNutritionOptimizer', () => {
     });
 
     describe('Restrições de Número de Bolsas', () => {
-        it('deve respeitar o número máximo de bolsas', () => {
-            const constraints: OptimizationConstraints & { max_bags?: number } = {
+        it('deve respeitar o número máximo de bolsas (quantidade total)', () => {
+            const constraints: OptimizationConstraints = {
                 kcal_min: 2000,
                 kcal_max: 3000,
                 protein_min: 60,
@@ -259,10 +259,59 @@ describe('ParenteralNutritionOptimizer', () => {
 
             const result = optimizer.optimize(constraints);
 
-            if (result.status === 'Optimal') {
-                const totalBags = result.selected_bags.reduce((sum, bag) => sum + bag.quantity, 0);
-                expect(totalBags).toBeLessThanOrEqual(constraints.max_bags!);
-            }
+            // max_bags limita a QUANTIDADE TOTAL de bolsas (soma de todas as quantidades)
+            expect(result.status).toBe('Optimal');
+            const totalBagsQuantity = result.selected_bags.reduce((sum, bag) => sum + bag.quantity, 0);
+            expect(totalBagsQuantity).toBeLessThanOrEqual(constraints.max_bags! + 0.01); // tolerance
+        });
+
+        it('deve respeitar o número máximo de bolsas (1 bolsa)', () => {
+            const constraints: OptimizationConstraints = {
+                kcal_min: 600,
+                kcal_max: 700,
+                protein_min: 15,
+                protein_max: 20,
+                volume_max: 1500,
+                max_bags: 1,
+            };
+
+            const result = optimizer.optimize(constraints);
+
+            expect(result.status).toBe('Optimal');
+            const totalBagsQuantity = result.selected_bags.reduce((sum, bag) => sum + bag.quantity, 0);
+            expect(totalBagsQuantity).toBeLessThanOrEqual(1.01); // tolerance
+        });
+
+        it('deve retornar Infeasible quando max_bags é muito restritivo', () => {
+            const constraints: OptimizationConstraints = {
+                kcal_min: 3000, // Muitas calorias
+                kcal_max: 3500,
+                protein_min: 100,
+                protein_max: 120,
+                volume_max: 3000,
+                max_bags: 1, // Mas só pode usar 1 bolsa - impossível
+            };
+
+            const result = optimizer.optimize(constraints);
+
+            // Deve ser infeasible ou não atender todas as restrições
+            expect(result.status === 'Infeasible' || !result.constraints_met.kcal_min).toBe(true);
+        });
+
+        it('deve funcionar sem restrição de max_bags', () => {
+            const constraints: OptimizationConstraints = {
+                kcal_min: 2000,
+                kcal_max: 3000,
+                protein_min: 60,
+                protein_max: 90,
+                volume_max: 3000,
+            };
+
+            const result = optimizer.optimize(constraints);
+
+            expect(result.status).toBe('Optimal');
+            // Sem max_bags, pode usar quantas fórmulas forem necessárias
+            expect(result.num_bags).toBeGreaterThan(0);
         });
     });
 

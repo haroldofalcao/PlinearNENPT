@@ -15,7 +15,7 @@ export function useOptimizer(formulas: Formula[]) {
   const optimizer = useMemo(() => new ParenteralNutritionOptimizer(formulas), [formulas]);
 
   const validateConstraints = useCallback((
-    constraints: OptimizationConstraints & { max_bags?: number }
+    constraints: OptimizationConstraints
   ): ValidationError[] => {
     const errors: ValidationError[] = [];
 
@@ -42,7 +42,7 @@ export function useOptimizer(formulas: Formula[]) {
   }, []);
 
   const optimize = useCallback((
-    constraints: OptimizationConstraints & { max_bags?: number },
+    constraints: OptimizationConstraints,
     selectedFormulas?: string[],
     customCosts?: Record<string, number>,
     emulsionFilter: string = "All",
