@@ -165,7 +165,7 @@ export class ParenteralNutritionOptimizer {
 
       if (quantity && quantity > 0.001) {
         const variables = this.modelVariables[formula.id];
-        
+
         // Round to integer since we're using integer programming
         const intQuantity = Math.round(quantity);
 
