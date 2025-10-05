@@ -207,9 +207,43 @@ export class ParenteralNutritionOptimizer {
     const tolerance = 0.01;
     const maxBagsMet = !constraints.max_bags || totalBagsQuantity <= constraints.max_bags + tolerance;
 
+    // Check if ALL constraints are satisfied
+    const allConstraintsMet = 
+      maxBagsMet &&
+      constraintsMet.kcal_min &&
+      constraintsMet.kcal_max &&
+      constraintsMet.protein_min &&
+      constraintsMet.protein_max &&
+      constraintsMet.volume_max;
+
+    // Build error message for violated constraints
+    let errorMessage: string | undefined;
+    if (!allConstraintsMet) {
+      const violations: string[] = [];
+      if (!maxBagsMet) {
+        violations.push(`bolsas (${totalBagsQuantity} > ${constraints.max_bags})`);
+      }
+      if (!constraintsMet.kcal_min) {
+        violations.push(`calorias insuficientes (${totalKcal.toFixed(0)} < ${constraints.kcal_min})`);
+      }
+      if (!constraintsMet.kcal_max) {
+        violations.push(`excesso de calorias (${totalKcal.toFixed(0)} > ${constraints.kcal_max})`);
+      }
+      if (!constraintsMet.protein_min) {
+        violations.push(`proteína insuficiente (${totalProtein.toFixed(1)}g < ${constraints.protein_min}g)`);
+      }
+      if (!constraintsMet.protein_max) {
+        violations.push(`excesso de proteína (${totalProtein.toFixed(1)}g > ${constraints.protein_max}g)`);
+      }
+      if (!constraintsMet.volume_max) {
+        violations.push(`excesso de volume (${totalVolume.toFixed(0)}mL > ${constraints.volume_max}mL)`);
+      }
+      errorMessage = `Restrições violadas: ${violations.join(", ")}`;
+    }
+
     return {
-      status: maxBagsMet ? "Optimal" : "Infeasible",
-      message: maxBagsMet ? undefined : `Quantidade total de bolsas (${totalBagsQuantity.toFixed(2)}) excede o máximo permitido (${constraints.max_bags})`,
+      status: allConstraintsMet ? "Optimal" : "Infeasible",
+      message: errorMessage,
       total_cost: parseFloat(result.result.toFixed(2)),
       total_kcal: parseFloat(totalKcal.toFixed(1)),
       total_protein: parseFloat(totalProtein.toFixed(2)),
@@ -232,7 +266,8 @@ export class ParenteralNutritionOptimizer {
     totalVolume: number,
     constraints: OptimizationConstraints
   ): OptimizationResult["constraints_met"] {
-    const tolerance = 0.1;
+    // Small tolerance for rounding errors only
+    const tolerance = 1.0;
     return {
       kcal_min: totalKcal >= (constraints.kcal_min || 0) - tolerance,
       kcal_max: totalKcal <= (constraints.kcal_max || Infinity) + tolerance,
