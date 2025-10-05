@@ -483,6 +483,15 @@ export default function Calculator() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
+                    <span className="text-sm">Gordura</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {result.total_fat.toFixed(1)} g
+                      </span>
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
                     <span className="text-sm">Volume</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">

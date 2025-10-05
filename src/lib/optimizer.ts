@@ -219,7 +219,7 @@ export class ParenteralNutritionOptimizer {
       total_fat: parseFloat(totalFat.toFixed(2)),
       selected_bags: selectedBags.sort((a, b) => b.total_cost - a.total_cost),
       constraints_met: constraintsMet,
-      num_bags: selectedBags.length,
+      num_bags: totalBagsQuantity, // Total quantity of bags, not number of different formulas
     };
   }
 
