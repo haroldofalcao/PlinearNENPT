@@ -266,15 +266,29 @@ export class ParenteralNutritionOptimizer {
     totalVolume: number,
     constraints: OptimizationConstraints
   ): OptimizationResult["constraints_met"] {
-    // Small tolerance for rounding errors only
-    const tolerance = 1.0;
-    return {
+    // Very small tolerance for rounding errors only (0.5 units)
+    const tolerance = 0.5;
+    
+    const met = {
       kcal_min: totalKcal >= (constraints.kcal_min || 0) - tolerance,
       kcal_max: totalKcal <= (constraints.kcal_max || Infinity) + tolerance,
       protein_min: totalProtein >= (constraints.protein_min || 0) - tolerance,
       protein_max: totalProtein <= (constraints.protein_max || Infinity) + tolerance,
       volume_max: totalVolume <= (constraints.volume_max || Infinity) + tolerance,
     };
+    
+    // Debug log for constraint violations
+    if (!met.volume_max) {
+      console.log(`[OPTIMIZER] Volume constraint violated: ${totalVolume.toFixed(1)}mL > ${constraints.volume_max}mL (+ ${tolerance} tolerance)`);
+    }
+    if (!met.kcal_max) {
+      console.log(`[OPTIMIZER] Calorie max constraint violated: ${totalKcal.toFixed(1)} > ${constraints.kcal_max} (+ ${tolerance} tolerance)`);
+    }
+    if (!met.protein_max) {
+      console.log(`[OPTIMIZER] Protein max constraint violated: ${totalProtein.toFixed(1)}g > ${constraints.protein_max}g (+ ${tolerance} tolerance)`);
+    }
+    
+    return met;
   }
 
   /**
